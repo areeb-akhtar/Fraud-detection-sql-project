@@ -78,7 +78,44 @@ SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
 ORDER BY table_name;
-
+``
 SELECT *
 FROM transactions
 LIMIT 10;
+```
+
+Running the project locally
+
+Prerequisites
+
+Docker and Docker Compose installed
+Any SQL client that can connect to PostgreSQL on localhost
+
+Start PostgreSQL
+
+docker compose up -d
+
+
+This starts a PostgreSQL container with database fraud_db, user app, password apppass.
+
+Apply schema and seed data
+
+Connect to fraud_db on localhost port 5432 with your SQL client, then run in order
+
+\i sql/schema.sql;
+\i sql/seed.sql;
+
+
+If your client does not support \i, just open each file and execute its contents.
+
+Run detection rules
+
+Execute each query file in the queries folder and inspect the results.
+
+Finally, create the risk score view and query it.
+
+\i queries/05_risk_score_view.sql;
+
+SELECT *
+FROM account_risk_scores
+ORDER BY risk_score DESC NULLS LAST;
