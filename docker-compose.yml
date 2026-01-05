@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: fraud_pg
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: apppass
+      POSTGRES_DB: fraud_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - fraud_pg_data:/var/lib/postgresql/data
+volumes:
+  fraud_pg_data:
