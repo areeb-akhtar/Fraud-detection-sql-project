@@ -83,39 +83,46 @@ SELECT *
 FROM transactions
 LIMIT 10;
 ```
+## Detection rules
 
-Running the project locally
+Each detection rule is a standalone SQL query in the `queries` folder. Every rule scans the transaction history and returns only the accounts or transactions that look suspicious.
 
-Prerequisites
+### Burst spending
 
-Docker and Docker Compose installed
-Any SQL client that can connect to PostgreSQL on localhost
+File name `01_burst_spending.sql`.
 
-Start PostgreSQL
+This rule uses a window function to count how many transactions an account performs in a rolling five minute window. If the count within that window exceeds a chosen threshold, for example eight transactions in five minutes, the account is flagged. In the seeded data this rule identifies account `2002`, which makes a rapid series of small purchases that look like card testing or automated fraud.
 
-docker compose up -d
+### Impossible travel
 
+File name `02_impossible_travel.sql`.
 
-This starts a PostgreSQL container with database fraud_db, user app, password apppass.
+This rule attaches city information to each transaction by joining to the merchants table, then compares pairs of transactions for the same account. If the same account appears in different cities within a short time gap, for example three hours, the movement is considered impossible and the account is flagged. In the seeded data this rule identifies account `2003`, which transacts in St Johns and Toronto within two hours.
 
-Apply schema and seed data
+### Amount outlier
 
-Connect to fraud_db on localhost port 5432 with your SQL client, then run in order
+File name `03_amount_outlier.sql`.
 
-\i sql/schema.sql;
-\i sql/seed.sql;
+This rule computes the average transaction amount for each account and then compares every transaction with that account specific baseline. Any transaction that is much larger than the usual spend for that account is flagged as a simple amount outlier. In the seeded data this rule highlights a very large electronics purchase on account `2004` relative to its normal small daily spending.
 
+### Device and IP churn
 
-If your client does not support \i, just open each file and execute its contents.
+File name `04_device_ip_churn.sql`.
 
-Run detection rules
+This rule groups transactions by account and calendar day and counts how many distinct device identifiers and IP addresses were used. Accounts that use many devices or many IPs in a single day are flagged, since this pattern is consistent with account takeover, credential sharing, or scripted attacks. In the seeded data this rule identifies account `2005`, which cycles through several devices and IPs during the same night.
 
-Execute each query file in the queries folder and inspect the results.
+## Risk scoring
 
-Finally, create the risk score view and query it.
+File name `05_risk_score_view.sql`.
 
-\i queries/05_risk_score_view.sql;
+Fraud analysts usually do not look at raw rule outputs. Instead, they work from a prioritised queue of accounts with risk scores. The view `account_risk_scores` provides this queue.
 
+The view performs four steps. First, it reruns each detection rule internally and assigns a point value to every rule that an account triggers, for example four points for impossible travel, three points for burst spending, and so on. Second, it unifies all of those rule outputs into a single set of flags. Third, it aggregates the flags by account and computes a total `risk_score` along with a count of `rules_triggered`. Finally, it orders accounts by descending risk score so that the most suspicious accounts appear at the top.
+
+You can inspect the ranked results with
+
+```sql
 SELECT *
 FROM account_risk_scores
 ORDER BY risk_score DESC NULLS LAST;
+
